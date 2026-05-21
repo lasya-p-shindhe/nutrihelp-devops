@@ -92,7 +92,7 @@ pipeline {
                 '''
                 bat 'docker build -t nutrihelp-api:staging .'
                 bat 'docker run -d --name nutrihelp-staging -p 3001:3000 nutrihelp-api:staging'
-                bat 'timeout /t 8 /nobreak'
+                bat 'ping -n 10 127.0.0.1 > nul'
                 bat 'curl -f http://localhost:3001/health'
                 echo 'Staging deployment verified!'
             }
@@ -112,7 +112,7 @@ pipeline {
                 bat 'docker tag nutrihelp-api:staging nutrihelp-api:v1.0.%BUILD_NUMBER%'
                 bat 'docker tag nutrihelp-api:staging nutrihelp-api:latest'
                 bat 'docker run -d --name nutrihelp-prod -p 3002:3000 nutrihelp-api:latest'
-                bat 'timeout /t 8 /nobreak'
+                bat 'ping -n 10 127.0.0.1 > nul'
                 bat 'curl -f http://localhost:3002/health'
                 echo 'Production release v1.0.%BUILD_NUMBER% is LIVE!'
             }
