@@ -85,12 +85,15 @@ pipeline {
         stage('Deploy') {
             steps {
                 echo '>>> STAGE 5: DEPLOY TO STAGING'
-                bat 'docker stop nutrihelp-staging || echo not running'
-                bat 'docker rm   nutrihelp-staging || echo not found'
-                bat 'docker build -t %DOCKER_IMAGE%:staging .'
-                bat 'docker run -d --name nutrihelp-staging -p %STAGING_PORT%:3000 %DOCKER_IMAGE%:staging'
-                bat 'timeout /t 5 /nobreak'
-                bat 'curl -f http://localhost:%STAGING_PORT%/health'
+                bat '''
+                    docker stop nutrihelp-staging 2>nul
+                    docker rm nutrihelp-staging 2>nul
+                    exit 0
+                '''
+                bat 'docker build -t nutrihelp-api:staging .'
+                bat 'docker run -d --name nutrihelp-staging -p 3001:3000 nutrihelp-api:staging'
+                bat 'timeout /t 8 /nobreak'
+                bat 'curl -f http://localhost:3001/health'
                 echo 'Staging deployment verified!'
             }
         }
@@ -101,13 +104,16 @@ pipeline {
         stage('Release') {
             steps {
                 echo '>>> STAGE 6: RELEASE TO PRODUCTION'
-                bat 'docker stop nutrihelp-prod || echo not running'
-                bat 'docker rm   nutrihelp-prod || echo not found'
-                bat 'docker tag  %DOCKER_IMAGE%:staging %DOCKER_IMAGE%:v1.0.%BUILD_NUMBER%'
-                bat 'docker tag  %DOCKER_IMAGE%:staging %DOCKER_IMAGE%:latest'
-                bat 'docker run -d --name nutrihelp-prod -p %PROD_PORT%:3000 %DOCKER_IMAGE%:latest'
-                bat 'timeout /t 5 /nobreak'
-                bat 'curl -f http://localhost:%PROD_PORT%/health'
+                bat '''
+                    docker stop nutrihelp-prod 2>nul
+                    docker rm nutrihelp-prod 2>nul
+                    exit 0
+                '''
+                bat 'docker tag nutrihelp-api:staging nutrihelp-api:v1.0.%BUILD_NUMBER%'
+                bat 'docker tag nutrihelp-api:staging nutrihelp-api:latest'
+                bat 'docker run -d --name nutrihelp-prod -p 3002:3000 nutrihelp-api:latest'
+                bat 'timeout /t 8 /nobreak'
+                bat 'curl -f http://localhost:3002/health'
                 echo 'Production release v1.0.%BUILD_NUMBER% is LIVE!'
             }
         }
@@ -118,20 +124,17 @@ pipeline {
         stage('Monitoring') {
             steps {
                 echo '>>> STAGE 7: MONITORING & ALERTING'
-                bat 'curl -s http://localhost:%PROD_PORT%/health'
-                bat 'curl -s http://localhost:%PROD_PORT%/metrics'
-                bat 'docker ps --filter name=nutrihelp --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"'
+                bat 'curl -s http://localhost:3002/health'
+                bat 'curl -s http://localhost:3002/metrics'
+                bat 'docker ps --filter name=nutrihelp'
                 bat '''
                     echo NUTRIHELP MONITORING REPORT > monitoring-report.txt
                     echo ============================= >> monitoring-report.txt
-                    echo. >> monitoring-report.txt
                     curl -s http://localhost:3002/health >> monitoring-report.txt
-                    echo. >> monitoring-report.txt
                     curl -s http://localhost:3002/metrics >> monitoring-report.txt
-                    echo. >> monitoring-report.txt
                     docker ps --filter name=nutrihelp >> monitoring-report.txt
                 '''
-                echo 'Monitoring complete - NutriHelp is healthy in production!'
+                echo 'Monitoring complete - NutriHelp is healthy!'
             }
             post {
                 always {
@@ -146,13 +149,13 @@ pipeline {
         success {
             echo '''
             ╔═══════════════════════════════════════════╗
-            ║  NUTRIHELP PIPELINE — ALL 7 STAGES DONE  ║
+            ║  NUTRIHELP PIPELINE - ALL 7 STAGES DONE  ║
             ║  Top HD Target Achieved!                  ║
             ╚═══════════════════════════════════════════╝
             '''
         }
         failure {
-            echo 'Pipeline failed — check the stage logs above'
+            echo 'Pipeline failed - check the stage logs above'
         }
         always {
             echo 'NutriHelp pipeline finished.'
